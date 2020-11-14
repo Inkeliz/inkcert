@@ -69,11 +69,13 @@ func NewServer(rand io.Reader, info *Info) *Server {
 
 	server := &Server{Client: make(map[string]*tls.Certificate, 0)}
 
+	t := time.Date(2020, time.January, 1, 2, 3, 4, 5, time.UTC)
+
 	server.CA = &x509.Certificate{
-		SerialNumber:          newSerial(rand),
+		SerialNumber:          newSerial(rand, ""),
 		Subject:               newSubject(info),
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(10, 0, 0),
+		NotBefore:             t,
+		NotAfter:              t.AddDate(30, 0, 0),
 		IsCA:                  true,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
@@ -204,20 +206,28 @@ func (s *Server) createGenerator(data fmt.Stringer) io.Reader {
 }
 
 func (s *Server) createClient(rand io.Reader, info *Info) *x509.Certificate {
+	t := time.Now()
+
 	return &x509.Certificate{
-		SerialNumber: newSerial(rand),
+		SerialNumber: newSerial(rand, t.String()),
 		Subject:      newSubject(info),
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().AddDate(10, 0, 0),
+		NotBefore:    t,
+		NotAfter:     t.AddDate(1, 0, 0),
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 	}
 }
 
-func newSerial(rand io.Reader) *big.Int {
+func newSerial(rand io.Reader, additional string) *big.Int {
 	r := make([]byte, 16)
 	rand.Read(r)
+
+	if additional != "" {
+		h, _ := blake2b.New(16, r)
+		h.Write([]byte(additional))
+		r = h.Sum(nil)
+	}
 
 	return big.NewInt(0).SetBytes(r)
 }
